@@ -1,0 +1,10 @@
+customer_name,industry,country,tier,account_manager
+Acme Corp,Manufacturing,USA,Tier-1,Sarah Connor
+Wayne Tech,Technology,USA,Tier-1,Bruce Wayne
+Stark Ind,Aerospace,USA,Tier-1,Tony Stark
+Daily Bugle,Media,USA,Tier-3,Peter Parker
+Oscorp,Chemicals,USA,Tier-2,Norman Osborn
+Cyberdyne,Robotics,USA,Tier-2,Miles Dyson
+Umbrella Corp,Pharmaceuticals,USA,Tier-2,Albert Wesker
+Initech,Software,USA,Tier-3,Peter Gibbons
+Massive Dynamic,Conglomerate,USA,Tier-1,William Bell
