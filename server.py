@@ -322,6 +322,21 @@ def clear_chat(session: tuple[str, SessionState] = Depends(resolve_session)):
     return {"message": "Chat history cleared"}
 
 
+# Mirror all /api/... routes to /... so both /api/endpoint and /endpoint work seamlessly
+for _route in list(app.routes):
+    if hasattr(_route, "path") and _route.path.startswith("/api/"):
+        _unprefixed = _route.path[4:]
+        if _unprefixed and not any(r.path == _unprefixed for r in app.routes):
+            app.add_api_route(
+                _unprefixed,
+                _route.endpoint,
+                methods=_route.methods,
+                response_model=getattr(_route, "response_model", None),
+                dependencies=getattr(_route, "dependencies", None),
+                name=f"{_route.name}_alias",
+            )
+
+
 # Mount React build assets if present
 frontend_dist = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "dist"))
 if not os.path.exists(frontend_dist):

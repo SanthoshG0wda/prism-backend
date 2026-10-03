@@ -14,3 +14,5 @@ data/sessions.db
 *.db
 *.sqlite
 .vercel/
+.vercel
+.env*
