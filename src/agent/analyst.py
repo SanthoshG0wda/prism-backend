@@ -79,6 +79,30 @@ class DataAnalystAgent:
         logger.info(f"Agent received question: '{user_question}'")
         yield {"type": "status", "text": "Understanding your question…"}
 
+        # Normalize slash commands (e.g. /dashboard, /quality, /anomalies, /forecast, /sql, /profile, /chart)
+        raw_cmd = user_question.strip().lower()
+        if raw_cmd.startswith("/"):
+            slash_map = {
+                "/dashboard": "Generate an Executive Dashboard artifact for the active dataset",
+                "/dash": "Generate an Executive Dashboard artifact for the active dataset",
+                "/quality": "Run a comprehensive data quality check on the active dataset",
+                "/anomalies": "Detect statistical anomalies and outliers in the dataset and explain why they were flagged",
+                "/outliers": "Detect statistical anomalies and outliers in the dataset and explain why they were flagged",
+                "/profile": "Profile and summarize all columns in the dataset",
+                "/summarize": "Profile and summarize all columns in the dataset",
+                "/forecast": "Forecast metric trends with 95% confidence intervals",
+                "/sql": "Generate and execute a DuckDB SQL query to analyze the dataset",
+                "/chart": "Generate an interactive chart visualizing the dataset metrics",
+                "/help": "what can you do",
+            }
+            cmd_key = raw_cmd.split()[0]
+            if cmd_key in slash_map:
+                remaining_args = user_question.strip()[len(cmd_key):].strip()
+                if remaining_args:
+                    user_question = f"{slash_map[cmd_key]}: {remaining_args}"
+                else:
+                    user_question = slash_map[cmd_key]
+
         # Handle natural conversational greetings, capabilities, and polite remarks
         clean_q = user_question.strip().lower().rstrip("!?. ")
         greetings = {"hello", "hi", "hey", "greetings", "good morning", "good afternoon", "good evening", "howdy", "sup", "yo"}
