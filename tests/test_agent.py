@@ -145,3 +145,26 @@ def test_agent_list_all_rows_in_sales_data():
     assert len(response.tool_result["records"]) == 2
 
 
+def test_agent_analyze_file_intent(agent_with_data):
+    response = agent_with_data.run("analyze this file")
+    assert response.tool_used == "profile_dataset"
+    assert response.tool_result is not None
+
+
+def test_format_tool_output_for_synthesis(agent_with_data):
+    import json
+    # Create 30 sample records mimicking sales_data
+    records = [{"order_id": 1000 + i, "item": f"Item_{i}", "val": i * 100.5} for i in range(30)]
+    mock_data = {"query": "SELECT * FROM sales LIMIT 100", "row_count": 30, "records": records}
+    
+    formatted = agent_with_data._format_tool_output_for_synthesis("execute_sql_query", mock_data)
+    # Must be valid parseable JSON
+    parsed = json.loads(formatted)
+    assert "records" in parsed
+    assert len(parsed["records"]) == 30
+    assert parsed["records_scope"] == "Complete result: all 30 records included."
+    # Ensure no record was cut in half
+    assert parsed["records"][-1]["order_id"] == 1029
+
+
+

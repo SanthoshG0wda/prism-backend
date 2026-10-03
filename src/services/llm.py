@@ -743,7 +743,7 @@ class LLMService:
                 })
 
             # 8. Profile / summarize dataset intent
-            if "profile" in prompt_lower or "summarize" in prompt_lower or "summary" in prompt_lower:
+            if any(w in prompt_lower for w in ["profile", "summarize", "summary", "analyze", "overview", "describe", "analysis"]):
                 table_target = "active_dataset"
                 if "customer" in prompt_lower:
                     table_target = "customers"

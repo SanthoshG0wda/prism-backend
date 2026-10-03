@@ -407,11 +407,12 @@ class DataAnalystAgent:
 
         # Step 7: Natural language explanation & business takeaways (streamed).
         yield {"type": "status", "text": "Writing answer…"}
+        formatted_tool_output = self._format_tool_output_for_synthesis(plan.selected_tool, tool_result.result_data)
         try:
             explanation = yield from self._generate_text_stream(
                 f"USER QUESTION: {planning_question}\n\n"
                 f"TOOL USED: {plan.selected_tool}\n"
-                f"TOOL OUTPUT DATA:\n{json.dumps(tool_result.result_data, default=str)[:3000]}\n\n"
+                f"TOOL OUTPUT DATA:\n{formatted_tool_output}\n\n"
                 f"Explain the findings truthfully based strictly on the above numbers. Provide actionable business insights.",
                 SYSTEM_SYNTHESIS_PROMPT,
                 fallback=lambda: self._offline_synthesis(planning_question, plan, tool_result),
@@ -819,6 +820,44 @@ class DataAnalystAgent:
             return f"{value:,.2f}"
         return str(value)
 
+    def _format_tool_output_for_synthesis(self, tool_name: str, result_data: Any) -> str:
+        """Format deterministic tool execution data cleanly for synthesis without truncating records mid-token."""
+        if not isinstance(result_data, dict):
+            return json.dumps(result_data, default=str)[:16000]
+
+        # Case 1: Tabular results with 'records' (SQL queries, top-k analysis, etc.)
+        if "records" in result_data and isinstance(result_data["records"], list):
+            records = result_data["records"]
+            total_count = result_data.get("row_count", len(records))
+
+            clean_records = []
+            current_chars = 0
+            max_budget = 16000
+            for rec in records:
+                rec_str = json.dumps(rec, default=str)
+                if current_chars + len(rec_str) > max_budget:
+                    break
+                clean_records.append(rec)
+                current_chars += len(rec_str)
+
+            payload = dict(result_data)
+            payload["records"] = clean_records
+            if len(clean_records) == total_count:
+                payload["records_scope"] = f"Complete result: all {total_count} records included."
+            else:
+                payload["records_scope"] = f"Displaying first {len(clean_records)} of {total_count} complete records."
+            return json.dumps(payload, indent=2, default=str)
+
+        # Case 2: Profiling metadata or Data Quality reports
+        if "metadata" in result_data or "quality_report" in result_data:
+            return json.dumps(result_data, indent=2, default=str)[:18000]
+
+        # Case 3: Other dictionaries (aggregates, anomalies, charts, forecast)
+        serialized = json.dumps(result_data, indent=2, default=str)
+        if len(serialized) <= 18000:
+            return serialized
+        return serialized[:18000]
+
     def _offline_synthesis(
         self, question: str, plan: QueryPlan, tool_result: ToolExecutionResult
     ) -> str:
@@ -862,7 +901,17 @@ class DataAnalystAgent:
                 lines.append(f"- {r.get('date')}: **{r.get('forecast')}** (95% CI {r.get('lower_bound_95')}–{r.get('upper_bound_95')})")
         elif plan.selected_tool in ("profile_dataset", "check_data_quality"):
             qr = data.get("quality_report") or data.get("metadata") or {}
-            lines.append(f"Rows: **{qr.get('row_count', '?')}**, completeness considerations in quality report.")
+            row_cnt = qr.get('row_count', '?')
+            col_cnt = qr.get('column_count', len(qr.get('columns', [])))
+            lines.append(f"Analyzed dataset: **{row_cnt}** rows across **{col_cnt}** columns.")
+            cols = qr.get("columns", [])
+            if cols:
+                lines.append("\n**Key Column Profiles:**")
+                for c in cols[:8]:
+                    c_name = c.get("name") if isinstance(c, dict) else getattr(c, "name", str(c))
+                    c_dtype = c.get("dtype") if isinstance(c, dict) else getattr(c, "dtype", "")
+                    c_null = c.get("null_count", 0) if isinstance(c, dict) else getattr(c, "null_count", 0)
+                    lines.append(f"- `{c_name}` ({c_dtype}): {c_null} null(s)")
             for issue in (qr.get("quality_issues") or [])[:5]:
                 lines.append(f"- {issue}")
         else:
